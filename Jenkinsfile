@@ -101,7 +101,8 @@ YAMLEOF
                             wget -q -O /tmp/pr.json --post-data='{"title":"ci: signaldash images ${IMG_TAG}","head":"ci/signaldash-${IMG_TAG}","base":"main","body":"Auto PR from Jenkins build ${BUILD_NUMBER}. Merge to deploy."}' \
                               --header="Authorization: Bearer ${GH_TOKEN}" --header="Accept: application/vnd.github+json" \
                               "https://api.github.com/repos/firoos18/homelab-gitops/pulls"
-                            sed -n 's/.*"html_url":"\([^"]*\)".*/PR: \1/p' /tmp/pr.json
+                            # extract PR url — use grep, avoid backslash-in-groovy issues
+                            grep -o 'https://github.com/firoos18/homelab-gitops/pull/[0-9]*' /tmp/pr.json | head -1
                         '''
                     }
                 }
