@@ -13,74 +13,36 @@ pipeline {
     }
 
     stages {
-        stage('Build API') {
+        stage('Build + Push API') {
             steps {
                 dir('SignalDash.Api') {
                     container('docker') {
-                        sh '''
-                            docker build -t signaldash-api:${IMG_TAG} -t signaldash-api:latest .
-                            docker save signaldash-api:${IMG_TAG} -o /home/jenkins/agent/signaldash-api.tar
-                            chmod 644 /home/jenkins/agent/signaldash-api.tar
-                        '''
+                        withCredentials([string(credentialsId: 'github-pat', variable: 'GH_TOKEN')]) {
+                            sh '''
+                                echo "${GH_TOKEN}" | docker login ghcr.io -u firoos18 --password-stdin
+                                docker build -t ghcr.io/firoos18/signaldash-api:${IMG_TAG} -t ghcr.io/firoos18/signaldash-api:latest .
+                                docker push ghcr.io/firoos18/signaldash-api:${IMG_TAG}
+                            '''
+                        }
                     }
                 }
             }
         }
 
-        stage('Build Web') {
+        stage('Build + Push Web') {
             steps {
                 dir('web') {
                     container('docker') {
-                        sh '''
-                            docker build \
-                              --build-arg NEXT_PUBLIC_API_URL=https://signaldash-homelab \
-                              -t signaldash-web:${IMG_TAG} -t signaldash-web:latest .
-                            docker save signaldash-web:${IMG_TAG} -o /home/jenkins/agent/signaldash-web.tar
-                            chmod 644 /home/jenkins/agent/signaldash-web.tar
-                        '''
+                        withCredentials([string(credentialsId: 'github-pat', variable: 'GH_TOKEN')]) {
+                            sh '''
+                                echo "${GH_TOKEN}" | docker login ghcr.io -u firoos18 --password-stdin
+                                docker build \
+                                  --build-arg NEXT_PUBLIC_API_URL=https://signaldash-homelab \
+                                  -t ghcr.io/firoos18/signaldash-web:${IMG_TAG} -t ghcr.io/firoos18/signaldash-web:latest .
+                                docker push ghcr.io/firoos18/signaldash-web:${IMG_TAG}
+                            '''
+                        }
                     }
-                }
-            }
-        }
-
-        stage('Import to k3s') {
-            steps {
-                container('kubectl') {
-                    sh '''
-                        # stage tars into shared agent workspace (all containers share /home/jenkins/agent)
-                        cp /home/jenkins/agent/signaldash-api.tar /home/jenkins/agent/signaldash-web.tar . 2>/dev/null || true
-                        for img in api web; do
-                          cat > /tmp/import-${img}.yaml <<'YAMLEOF'
-apiVersion: v1
-kind: Pod
-metadata:
-  name: image-import-@IMG@
-  namespace: jenkins
-spec:
-  hostPID: true
-  containers:
-    - name: importer
-      image: busybox
-      command: ["/bin/sh", "-c"]
-      args: ["prev=0; while true; do sz=$(stat -c %s /tmp/signaldash-@IMG@.tar 2>/dev/null || echo 0); [ $sz -gt 0 ] && [ $sz = $prev ] && break; prev=$sz; sleep 2; done; nsenter -t 1 -m -i -- /usr/local/bin/k3s ctr -n k8s.io images import /tmp/signaldash-@IMG@.tar && echo IMPORT-OK"]
-      securityContext: { privileged: true }
-      volumeMounts:
-        - { name: tars, mountPath: /tmp }
-  volumes:
-    - name: tars
-      hostPath: { path: /tmp, type: Directory }
-  restartPolicy: Never
-YAMLEOF
-                          sed -i "s/@IMG@/${img}/g" /tmp/import-${img}.yaml
-                          kubectl create -f /tmp/import-${img}.yaml
-                          # wait for container to exist, then push tar → lands on HOST /tmp via hostPath
-                          kubectl wait --for=condition=Ready pod/image-import-${img} -n jenkins --timeout=120s || true
-                          kubectl cp /home/jenkins/agent/signaldash-${img}.tar image-import-${img}:/tmp/signaldash-${img}.tar -n jenkins -c importer
-                          kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/image-import-${img} -n jenkins --timeout=180s
-                          kubectl logs image-import-${img} -n jenkins | tail -1
-                          kubectl delete pod image-import-${img} -n jenkins --wait=false || true
-                        done
-                    '''
                 }
             }
         }
