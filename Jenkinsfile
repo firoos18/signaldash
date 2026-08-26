@@ -97,11 +97,14 @@ YAMLEOF
                             sed -i "s|image: signaldash-web:.*|image: signaldash-web:${IMG_TAG}|" apps/signaldash/web.yaml
                             git -c user.name="jenkins-ci" -c user.email="ci@homelab" commit -am "ci: signaldash images ${IMG_TAG} [skip ci]"
                             git push -u origin ci/signaldash-${IMG_TAG} 2>&1 | tail -1
-                            # open PR (busybox wget — git container has no curl)
-                            wget -q -O /tmp/pr.json --post-data='{"title":"ci: signaldash images ${IMG_TAG}","head":"ci/signaldash-${IMG_TAG}","base":"main","body":"Auto PR from Jenkins build ${BUILD_NUMBER}. Merge to deploy."}' \
+                            # open PR — JSON via file, avoids shell/groovy quote hell
+                            cat > /tmp/pr-body.json << PRJSON
+{"title":"ci: signaldash images ${IMG_TAG}","head":"ci/signaldash-${IMG_TAG}","base":"main","body":"Auto PR from Jenkins build ${BUILD_NUMBER}. Merge to deploy."}
+PRJSON
+                            wget -q -O /tmp/pr.json --post-file=/tmp/pr-body.json \
                               --header="Authorization: Bearer ${GH_TOKEN}" --header="Accept: application/vnd.github+json" \
                               "https://api.github.com/repos/firoos18/homelab-gitops/pulls"
-                            # extract PR url — use grep, avoid backslash-in-groovy issues
+                            # extract PR url
                             grep -o 'https://github.com/firoos18/homelab-gitops/pull/[0-9]*' /tmp/pr.json | head -1
                         '''
                     }
