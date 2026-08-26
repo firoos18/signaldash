@@ -19,7 +19,7 @@ pipeline {
                     container('docker') {
                         sh '''
                             docker build -t signaldash-api:${IMG_TAG} -t signaldash-api:latest .
-                            docker save signaldash-api:${IMG_TAG} -o /tmp/signaldash-api.tar
+                            docker save signaldash-api:${IMG_TAG} -o /home/jenkins/agent/signaldash-api.tar
                         '''
                     }
                 }
@@ -34,7 +34,7 @@ pipeline {
                             docker build \
                               --build-arg NEXT_PUBLIC_API_URL=https://signaldash-homelab \
                               -t signaldash-web:${IMG_TAG} -t signaldash-web:latest .
-                            docker save signaldash-web:${IMG_TAG} -o /tmp/signaldash-web.tar
+                            docker save signaldash-web:${IMG_TAG} -o /home/jenkins/agent/signaldash-web.tar
                         '''
                     }
                 }
@@ -45,13 +45,14 @@ pipeline {
             steps {
                 container('kubectl') {
                     sh '''
-                        # privileged import pod: mounts host root, nsenter into host, k3s ctr images import
+                        # stage tars into shared agent workspace (all containers share /home/jenkins/agent)
+                        cp /home/jenkins/agent/signaldash-api.tar /home/jenkins/agent/signaldash-web.tar . 2>/dev/null || true
                         for img in api web; do
-                          cat <<EOF | kubectl apply -f - 2>/dev/null || kubectl create -f -
+                          cat > /tmp/import-${img}.yaml <<YAMLEOF
 apiVersion: v1
 kind: Pod
 metadata:
-  name: image-import-\${img}
+  name: image-import-${img}
   namespace: kube-system
 spec:
   hostPID: true
@@ -59,7 +60,7 @@ spec:
     - name: importer
       image: busybox
       command: ["/bin/sh", "-c"]
-      args: ["nsenter -t 1 -m -i -- /usr/local/bin/k3s ctr images import /tmp/signaldash-\${img}.tar && echo IMPORT-OK"]
+      args: ["nsenter -t 1 -m -i -- /usr/local/bin/k3s ctr images import /tmp/signaldash-${img}.tar && echo IMPORT-OK"]
       securityContext: { privileged: true }
       volumeMounts:
         - { name: tars, mountPath: /tmp }
@@ -67,11 +68,13 @@ spec:
     - name: tars
       hostPath: { path: /tmp, type: Directory }
   restartPolicy: Never
-EOF
-                          # wait for completion
-                          kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/image-import-\${img} -n kube-system --timeout=180s
-                          kubectl logs image-import-\${img} -n kube-system | tail -1
-                          kubectl delete pod image-import-\${img} -n kube-system --wait=false || true
+YAMLEOF
+                          kubectl create -f /tmp/import-${img}.yaml
+                          # push tar into pod → lands on HOST /tmp via hostPath
+                          kubectl cp /home/jenkins/agent/signaldash-${img}.tar image-import-${img}:/tmp/signaldash-${img}.tar -n kube-system
+                          kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/image-import-${img} -n kube-system --timeout=180s
+                          kubectl logs image-import-${img} -n kube-system | tail -1
+                          kubectl delete pod image-import-${img} -n kube-system --wait=false || true
                         done
                     '''
                 }
