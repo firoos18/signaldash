@@ -62,7 +62,7 @@ spec:
     - name: importer
       image: busybox
       command: ["/bin/sh", "-c"]
-      args: ["while [ ! -f /tmp/signaldash-${img}.tar ]; do sleep 1; done; nsenter -t 1 -m -i -- /usr/local/bin/k3s ctr -n k8s.io images import /tmp/signaldash-${img}.tar && echo IMPORT-OK"]
+      args: ["prev=0; while true; do sz=$(stat -c %s /tmp/signaldash-${img}.tar 2>/dev/null || echo 0); [ \"$sz\" -gt 0 ] && [ \"$sz\" = \"$prev\" ] && break; prev=$sz; sleep 2; done; nsenter -t 1 -m -i -- /usr/local/bin/k3s ctr -n k8s.io images import /tmp/signaldash-${img}.tar && echo IMPORT-OK"]
       securityContext: { privileged: true }
       volumeMounts:
         - { name: tars, mountPath: /tmp }
