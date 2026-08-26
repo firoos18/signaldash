@@ -50,11 +50,11 @@ pipeline {
                         # stage tars into shared agent workspace (all containers share /home/jenkins/agent)
                         cp /home/jenkins/agent/signaldash-api.tar /home/jenkins/agent/signaldash-web.tar . 2>/dev/null || true
                         for img in api web; do
-                          cat > /tmp/import-${img}.yaml <<YAMLEOF
+                          cat > /tmp/import-${img}.yaml <<'YAMLEOF'
 apiVersion: v1
 kind: Pod
 metadata:
-  name: image-import-${img}
+  name: image-import-@IMG@
   namespace: jenkins
 spec:
   hostPID: true
@@ -62,7 +62,7 @@ spec:
     - name: importer
       image: busybox
       command: ["/bin/sh", "-c"]
-      args: ["prev=0; while true; do sz=$(stat -c %s /tmp/signaldash-${img}.tar 2>/dev/null || echo 0); [ \"$sz\" -gt 0 ] && [ \"$sz\" = \"$prev\" ] && break; prev=$sz; sleep 2; done; nsenter -t 1 -m -i -- /usr/local/bin/k3s ctr -n k8s.io images import /tmp/signaldash-${img}.tar && echo IMPORT-OK"]
+      args: ["prev=0; while true; do sz=$(stat -c %s /tmp/signaldash-@IMG@.tar 2>/dev/null || echo 0); [ $sz -gt 0 ] && [ $sz = $prev ] && break; prev=$sz; sleep 2; done; nsenter -t 1 -m -i -- /usr/local/bin/k3s ctr -n k8s.io images import /tmp/signaldash-@IMG@.tar && echo IMPORT-OK"]
       securityContext: { privileged: true }
       volumeMounts:
         - { name: tars, mountPath: /tmp }
@@ -71,6 +71,7 @@ spec:
       hostPath: { path: /tmp, type: Directory }
   restartPolicy: Never
 YAMLEOF
+                          sed -i "s/@IMG@/${img}/g" /tmp/import-${img}.yaml
                           kubectl create -f /tmp/import-${img}.yaml
                           # wait for container to exist, then push tar → lands on HOST /tmp via hostPath
                           kubectl wait --for=condition=Ready pod/image-import-${img} -n jenkins --timeout=120s || true
