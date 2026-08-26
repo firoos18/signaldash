@@ -53,7 +53,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: image-import-${img}
-  namespace: kube-system
+  namespace: jenkins
 spec:
   hostPID: true
   containers:
@@ -71,10 +71,10 @@ spec:
 YAMLEOF
                           kubectl create -f /tmp/import-${img}.yaml
                           # push tar into pod → lands on HOST /tmp via hostPath
-                          kubectl cp /home/jenkins/agent/signaldash-${img}.tar image-import-${img}:/tmp/signaldash-${img}.tar -n kube-system
-                          kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/image-import-${img} -n kube-system --timeout=180s
-                          kubectl logs image-import-${img} -n kube-system | tail -1
-                          kubectl delete pod image-import-${img} -n kube-system --wait=false || true
+                          kubectl cp /home/jenkins/agent/signaldash-${img}.tar image-import-${img}:/tmp/signaldash-${img}.tar -n jenkins
+                          kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/image-import-${img} -n jenkins --timeout=180s
+                          kubectl logs image-import-${img} -n jenkins | tail -1
+                          kubectl delete pod image-import-${img} -n jenkins --wait=false || true
                         done
                     '''
                 }
