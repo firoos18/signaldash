@@ -70,8 +70,9 @@ spec:
   restartPolicy: Never
 YAMLEOF
                           kubectl create -f /tmp/import-${img}.yaml
-                          # push tar into pod → lands on HOST /tmp via hostPath
-                          kubectl cp /home/jenkins/agent/signaldash-${img}.tar image-import-${img}:/tmp/signaldash-${img}.tar -n jenkins
+                          # wait for container to exist, then push tar → lands on HOST /tmp via hostPath
+                          kubectl wait --for=condition=Ready pod/image-import-${img} -n jenkins --timeout=120s || true
+                          kubectl cp /home/jenkins/agent/signaldash-${img}.tar image-import-${img}:/tmp/signaldash-${img}.tar -n jenkins -c importer
                           kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/image-import-${img} -n jenkins --timeout=180s
                           kubectl logs image-import-${img} -n jenkins | tail -1
                           kubectl delete pod image-import-${img} -n jenkins --wait=false || true
