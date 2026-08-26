@@ -20,6 +20,7 @@ pipeline {
                         sh '''
                             docker build -t signaldash-api:${IMG_TAG} -t signaldash-api:latest .
                             docker save signaldash-api:${IMG_TAG} -o /home/jenkins/agent/signaldash-api.tar
+                            chmod 644 /home/jenkins/agent/signaldash-api.tar
                         '''
                     }
                 }
@@ -35,6 +36,7 @@ pipeline {
                               --build-arg NEXT_PUBLIC_API_URL=https://signaldash-homelab \
                               -t signaldash-web:${IMG_TAG} -t signaldash-web:latest .
                             docker save signaldash-web:${IMG_TAG} -o /home/jenkins/agent/signaldash-web.tar
+                            chmod 644 /home/jenkins/agent/signaldash-web.tar
                         '''
                     }
                 }
