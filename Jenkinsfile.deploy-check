@@ -22,6 +22,7 @@ pipeline {
                             DESIRED_API=$(grep -oE "image: signaldash-api:[0-9]+" apps/signaldash/api.yaml | head -1 | grep -oE "[0-9]+$")
                             DESIRED_WEB=$(grep -oE "image: signaldash-web:[0-9]+" apps/signaldash/web.yaml | head -1 | grep -oE "[0-9]+$")
                             echo "Desired from gitops: api=${DESIRED_API} web=${DESIRED_WEB}"
+                        echo "DESIRED_API=$DESIRED_API DESIRED_WEB=$DESIRED_WEB" > /home/jenkins/agent/desired.env
                         '''
                     }
                 }
@@ -30,14 +31,13 @@ pipeline {
                         RUNNING_API=$(kubectl get pods -n signaldash -l app=signaldash-api -o jsonpath='{.items[0].spec.containers[0].image}' 2>/dev/null | sed 's/.*://')
                         RUNNING_WEB=$(kubectl get pods -n signaldash -l app=signaldash-web -o jsonpath='{.items[0].spec.containers[0].image}' 2>/dev/null | sed 's/.*://')
                         echo "Running: api=${RUNNING_API} web=${RUNNING_WEB}"
-                        echo "DESIRED_API=$DESIRED_API DESIRED_WEB=$DESIRED_WEB" > /tmp/desired.env
-                        echo "RUNNING_API=$RUNNING_API RUNNING_WEB=$RUNNING_WEB" > /tmp/running.env
+                        echo "RUNNING_API=$RUNNING_API RUNNING_WEB=$RUNNING_WEB" > /home/jenkins/agent/running.env
                     '''
                 }
                 container('git') {
                     sh '''
-                        . /tmp/desired.env 2>/dev/null || true
-                        . /tmp/running.env 2>/dev/null || true
+                        . /home/jenkins/agent/desired.env 2>/dev/null || true
+                        . /home/jenkins/agent/running.env 2>/dev/null || true
                         if [ "$RUNNING_API" = "$DESIRED_API" ] && [ "$RUNNING_WEB" = "$DESIRED_WEB" ]; then
                             echo "DEPLOYED: api:${DESIRED_API} web:${DESIRED_WEB} — ArgoCD synced, pods running desired tags"
                         else
