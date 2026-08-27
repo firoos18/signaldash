@@ -126,7 +126,7 @@ app.MapGet("/api/brokers", async (IDbConnection db, string? ticker = null, strin
                SUM(CASE WHEN side = 'BUY' THEN net_lots ELSE -net_lots END) AS net_lots,
                SUM(CASE WHEN side = 'BUY' THEN net_value_idr ELSE -net_value_idr END) AS net_value_idr,
                ROUND(AVG(avg_price) FILTER (WHERE avg_price IS NOT NULL)::numeric, 2) AS avg_price,
-               MAX(date) AS last_date
+               MAX(date)::timestamp AS last_date
         FROM broker_stock_daily
         WHERE date >= CURRENT_DATE - @days
           AND (@ticker IS NULL OR ticker = @ticker)
