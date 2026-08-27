@@ -117,6 +117,39 @@ app.MapGet("/api/positions", async (IDbConnection db, string? market = null) =>
     return Results.Ok(rows);
 });
 
+app.MapGet("/api/brokers", async (IDbConnection db, string? ticker = null, string? broker = null, int days = 7) =>
+{
+    days = Math.Clamp(days, 1, 90);
+    // net lots/value per broker per ticker over window (buy +, sell -)
+    var rows = await Query<BrokerRow>(db, """
+        SELECT ticker, broker_code, investor_type,
+               SUM(CASE WHEN side = 'BUY' THEN net_lots ELSE -net_lots END) AS net_lots,
+               SUM(CASE WHEN side = 'BUY' THEN net_value_idr ELSE -net_value_idr END) AS net_value_idr,
+               ROUND(AVG(avg_price) FILTER (WHERE avg_price IS NOT NULL), 2) AS avg_price,
+               MAX(date) AS last_date
+        FROM broker_stock_daily
+        WHERE date >= CURRENT_DATE - @days
+          AND (@ticker IS NULL OR ticker = @ticker)
+          AND (@broker IS NULL OR broker_code = @broker)
+        GROUP BY ticker, broker_code, investor_type
+        ORDER BY net_value_idr DESC
+        """, new { days, ticker, broker });
+    return Results.Ok(rows);
+});
+
+app.MapGet("/api/orderbook", async (IDbConnection db, string? ticker = null, int limit = 1) =>
+{
+    // latest depth snapshot per ticker
+    var rows = await Query<OrderbookRow>(db, """
+        SELECT DISTINCT ON (ticker) ticker, ts, last, imb5, imb10, wall, fnet,
+               total_bid_lot, total_ask_lot
+        FROM ob_snapshot
+        WHERE (@ticker IS NULL OR ticker = @ticker)
+        ORDER BY ticker, ts DESC LIMIT @limit
+        """, new { ticker, limit });
+    return Results.Ok(rows);
+});
+
 app.Run();
 
 // ponytail: plain classes (not records) — Dapper needs settable props; records are
@@ -140,3 +173,11 @@ class PositionRow { public string Market { get; set; } = ""; public string Pair 
     public string Side { get; set; } = ""; public double? Entry { get; set; } public double? Sl { get; set; }
     public double? Tp { get; set; } public double? Units { get; set; } public DateTime? OpenedAt { get; set; }
     public DateTime SnapshotTs { get; set; } }
+class BrokerRow { public string Ticker { get; set; } = ""; public string BrokerCode { get; set; } = "";
+    public string InvestorType { get; set; } = ""; public double NetLots { get; set; }
+    public double NetValueIdr { get; set; } public double? AvgPrice { get; set; }
+    public DateTime LastDate { get; set; } }
+class OrderbookRow { public string Ticker { get; set; } = ""; public DateTime Ts { get; set; }
+    public double? Last { get; set; } public double? Imb5 { get; set; } public double? Imb10 { get; set; }
+    public double? Wall { get; set; } public double? Fnet { get; set; }
+    public double? TotalBidLot { get; set; } public double? TotalAskLot { get; set; } }

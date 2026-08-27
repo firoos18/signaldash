@@ -5,7 +5,7 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
 import { IconActivity, IconTrendingUp, IconWallet, IconChartLine } from "@tabler/icons-react";
-import { api, type Health, type EquityPoint, type Signal, type Trade, type Stats, type Position } from "@/lib/api";
+import { api, type Health, type EquityPoint, type Signal, type Trade, type Stats, type Position, type Broker, type Orderbook } from "@/lib/api";
 
 // ponytail: single client page, no RSC/data layer. Fine for one user; split into
 //           server components + suspense if this ever serves many viewers.
@@ -16,12 +16,14 @@ export default function Dashboard() {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [stats, setStats] = useState<Stats[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
+  const [brokers, setBrokers] = useState<Broker[]>([]);
+  const [orderbook, setOrderbook] = useState<Orderbook[]>([]);
   const [err, setErr] = useState<string | null>(null);
 
   const load = () => {
-    Promise.all([api.health(), api.equity(), api.signals(), api.trades(), api.stats(), api.positions()])
-      .then(([h, e, s, t, st, p]) => {
-        setHealth(h); setEquity(e); setSignals(s); setTrades(t); setStats(st); setPositions(p); setErr(null);
+    Promise.all([api.health(), api.equity(), api.signals(), api.trades(), api.stats(), api.positions(), api.brokers(), api.orderbook()])
+      .then(([h, e, s, t, st, p, br, ob]) => {
+        setHealth(h); setEquity(e); setSignals(s); setTrades(t); setStats(st); setPositions(p); setBrokers(br); setOrderbook(ob); setErr(null);
       })
       .catch((e: Error) => setErr(e.message));
   };
@@ -150,6 +152,47 @@ export default function Dashboard() {
             )}
           </section>
         </div>
+
+        {/* broker watch — bandarmology */}
+        <section className="mt-6 rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-sm font-medium text-zinc-400">Broker Watch (IDX bandarmology)</h2>
+            <span className="text-xs text-zinc-600">7d net · lots · IDR</span>
+          </div>
+          {brokers.length === 0 ? <Empty label="No broker data yet — collected daily after IDX close." /> : (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <h3 className="mb-2 text-xs text-zinc-500">Broker net flow by stock</h3>
+                <Table head={["Stock", "Broker", "Type", "Net lots", "Net IDR"]}>
+                  {brokers.slice(0, 12).map((b, i) => (
+                    <tr key={i} className="border-t border-zinc-800/60">
+                      <td className="py-2 font-mono text-sm">{b.ticker}</td>
+                      <td className="py-2 font-mono text-sm">{b.brokerCode}</td>
+                      <td className="text-xs text-zinc-500">{b.investorType}</td>
+                      <td className={`font-mono text-sm ${b.netLots >= 0 ? "text-emerald-400" : "text-red-400"}`}>{b.netLots >= 0 ? "+" : ""}{b.netLots.toLocaleString()}</td>
+                      <td className={`font-mono text-sm ${b.netValueIdr >= 0 ? "text-emerald-400" : "text-red-400"}`}>{b.netValueIdr >= 0 ? "+" : ""}{(b.netValueIdr / 1e9).toFixed(2)}B</td>
+                    </tr>
+                  ))}
+                </Table>
+              </div>
+              <div>
+                <h3 className="mb-2 text-xs text-zinc-500">Orderbook depth (latest snapshot)</h3>
+                <Table head={["Stock", "Last", "Imb5", "Wall", "F. net"]}>
+                  {orderbook.map((o, i) => (
+                    <tr key={i} className="border-t border-zinc-800/60">
+                      <td className="py-2 font-mono text-sm">{o.ticker}</td>
+                      <td className="py-2 font-mono text-sm">{o.last?.toLocaleString() ?? "—"}</td>
+                      <td className={`font-mono text-sm ${(o.imb5 ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>{(o.imb5 ?? 0) >= 0 ? "+" : ""}{(o.imb5 ?? 0).toFixed(3)}</td>
+                      <td className="font-mono text-sm">{o.wall?.toFixed(1) ?? "—"}×</td>
+                      <td className={`font-mono text-sm ${(o.fnet ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>{o.fnet === null ? "—" : `${(o.fnet / 1e9).toFixed(1)}B`}</td>
+                    </tr>
+                  ))}
+                </Table>
+                <p className="mt-3 text-xs text-zinc-600">Imb5 = bid/ask volume imbalance (top 5 levels). Wall = largest level ÷ median. F. net = foreign net IDR.</p>
+              </div>
+            </div>
+          )}
+        </section>
 
         <footer className="mt-10 border-t border-zinc-800/60 pt-4 text-xs text-zinc-600">
           Auto-refresh 30s. Data: Postgres via SignalDash API.
