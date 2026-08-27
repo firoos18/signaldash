@@ -37,7 +37,7 @@ app.MapGet("/api/health", async (IDbConnection db) =>
         SELECT DISTINCT ON (market) market,
                equity, ts,
                EXTRACT(EPOCH FROM (now() - ts))::int AS "AgeSeconds"
-        FROM equity_snapshots ORDER BY market, ts DESC
+        FROM trn_equity_snapshot ORDER BY market, ts DESC
         """);
     return Results.Ok(new
     {
@@ -54,7 +54,7 @@ app.MapGet("/api/health", async (IDbConnection db) =>
 app.MapGet("/api/equity", async (IDbConnection db, string? market = null) =>
 {
     var rows = await Query<EquityRow>(db, """
-        SELECT market, equity, ts FROM equity_snapshots
+        SELECT market, equity, ts FROM trn_equity_snapshot
         WHERE (@market IS NULL OR market = @market)
         ORDER BY ts
         """, new { market });
@@ -67,7 +67,7 @@ app.MapGet("/api/signals", async (IDbConnection db, string? market = null,
     limit = Math.Clamp(limit, 1, 1000);
     var rows = await Query<SignalRow>(db, """
         SELECT market, pair, side, signal_ts, entry, sl, tp, reason, created_at
-        FROM signals
+        FROM trn_signal
         WHERE (@market IS NULL OR market = @market)
           AND (@pair IS NULL OR pair = @pair)
         ORDER BY signal_ts DESC LIMIT @limit
@@ -81,8 +81,8 @@ app.MapGet("/api/trades", async (IDbConnection db, string? market = null, int li
     var rows = await Query<TradeRow>(db, """
         SELECT t.pair, t.side, t.entry, t.exit, t.pnl, t.reason,
                t.opened_at, t.closed_at, s.market
-        FROM trades t
-        LEFT JOIN signals s ON s.pair = t.pair AND s.signal_ts = t.opened_at
+        FROM trn_trade t
+        LEFT JOIN trn_signal s ON s.pair = t.pair AND s.signal_ts = t.opened_at
         WHERE (@market IS NULL OR s.market = @market)
         ORDER BY t.closed_at DESC LIMIT @limit
         """, new { market, limit });
@@ -98,7 +98,7 @@ app.MapGet("/api/stats", async (IDbConnection db) =>
                CASE WHEN count(*) > 0 THEN count(*) FILTER (WHERE t.pnl > 0)::float / count(*) END AS win_rate,
                CASE WHEN SUM(t.pnl) FILTER (WHERE t.pnl < 0) = 0 THEN NULL
                     ELSE ABS(SUM(t.pnl) FILTER (WHERE t.pnl > 0) / SUM(t.pnl) FILTER (WHERE t.pnl < 0)) END AS profit_factor
-        FROM trades t LEFT JOIN signals s ON s.pair = t.pair AND s.signal_ts = t.opened_at
+        FROM trn_trade t LEFT JOIN trn_signal s ON s.pair = t.pair AND s.signal_ts = t.opened_at
         GROUP BY COALESCE(s.market, 'unknown')
         """);
     return Results.Ok(s);
@@ -110,7 +110,7 @@ app.MapGet("/api/positions", async (IDbConnection db, string? market = null) =>
     var rows = await Query<PositionRow>(db, """
         SELECT DISTINCT ON (market, pair) market, pair, side, entry, sl, tp,
                units, opened_at, snapshot_ts
-        FROM positions
+        FROM trn_position
         WHERE (@market IS NULL OR market = @market)
         ORDER BY market, pair, snapshot_ts DESC
         """, new { market });
