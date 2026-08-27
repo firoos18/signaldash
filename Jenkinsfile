@@ -56,8 +56,8 @@ pipeline {
                             rm -rf gitops && git clone --depth 1 "https://x-access-token:${GH_TOKEN}@${GITOPS_REPO#https://}" gitops
                             cd gitops
                             git checkout -b ci/signaldash-${IMG_TAG}
-                            sed -i "s|image: signaldash-api:.*|image: signaldash-api:${IMG_TAG}|" apps/signaldash/api.yaml
-                            sed -i "s|image: signaldash-web:.*|image: signaldash-web:${IMG_TAG}|" apps/signaldash/web.yaml
+                            sed -i "s|signaldash-api:[0-9]*|signaldash-api:${IMG_TAG}|" apps/signaldash/api.yaml
+                            sed -i "s|signaldash-web:[0-9]*|signaldash-web:${IMG_TAG}|" apps/signaldash/web.yaml
                             git -c user.name="jenkins-ci" -c user.email="ci@homelab" commit -am "ci: signaldash images ${IMG_TAG} [skip ci]"
                             git push -u origin ci/signaldash-${IMG_TAG} 2>&1 | tail -1
                             # open PR — JSON via file, avoids shell/groovy quote hell
