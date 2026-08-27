@@ -19,8 +19,8 @@ pipeline {
                             set -e
                             rm -rf gitops && git clone --depth 1 "https://x-access-token:${GH_TOKEN}@${GITOPS_REPO#https://}" gitops
                             cd gitops
-                            DESIRED_API=$(grep -oE "image: signaldash-api:[0-9]+" apps/signaldash/api.yaml | head -1 | grep -oE "[0-9]+$")
-                            DESIRED_WEB=$(grep -oE "image: signaldash-web:[0-9]+" apps/signaldash/web.yaml | head -1 | grep -oE "[0-9]+$")
+                            DESIRED_API=$(grep -oE "signaldash-api:[0-9]+" apps/signaldash/api.yaml | head -1 | grep -oE "[0-9]+$")
+                            DESIRED_WEB=$(grep -oE "signaldash-web:[0-9]+" apps/signaldash/web.yaml | head -1 | grep -oE "[0-9]+$")
                             echo "Desired from gitops: api=${DESIRED_API} web=${DESIRED_WEB}"
                         echo "DESIRED_API=$DESIRED_API DESIRED_WEB=$DESIRED_WEB" > /home/jenkins/agent/desired.env
                         '''
