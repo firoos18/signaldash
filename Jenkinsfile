@@ -55,20 +55,11 @@ pipeline {
                             set -e
                             rm -rf gitops && git clone --depth 1 "https://x-access-token:${GH_TOKEN}@${GITOPS_REPO#https://}" gitops
                             cd gitops
-                            git checkout -b ci/signaldash-${IMG_TAG}
                             sed -i "s|signaldash-api:[0-9]*|signaldash-api:${IMG_TAG}|" apps/signaldash/api.yaml
                             sed -i "s|signaldash-web:[0-9]*|signaldash-web:${IMG_TAG}|" apps/signaldash/web.yaml
                             git -c user.name="jenkins-ci" -c user.email="ci@homelab" commit -am "ci: signaldash images ${IMG_TAG} [skip ci]"
-                            git push -u origin ci/signaldash-${IMG_TAG} 2>&1 | tail -1
-                            # open PR — JSON via file, avoids shell/groovy quote hell
-                            cat > /tmp/pr-body.json << PRJSON
-{"title":"ci: signaldash images ${IMG_TAG}","head":"ci/signaldash-${IMG_TAG}","base":"main","body":"Auto PR from Jenkins build ${BUILD_NUMBER}. Merge to deploy."}
-PRJSON
-                            wget -q -O /tmp/pr.json --post-file=/tmp/pr-body.json \
-                              --header="Authorization: Bearer ${GH_TOKEN}" --header="Accept: application/vnd.github+json" \
-                              "https://api.github.com/repos/firoos18/homelab-gitops/pulls"
-                            # extract PR url
-                            grep -o 'https://github.com/firoos18/homelab-gitops/pull/[0-9]*' /tmp/pr.json | head -1
+                            git push origin main 2>&1 | tail -1
+                            echo "DEPLOYED-TAG: ${IMG_TAG} pushed to main — ArgoCD auto-syncs"
                         '''
                     }
                 }
