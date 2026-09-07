@@ -71,6 +71,10 @@ export default function Dashboard() {
             <p className="text-sm text-zinc-500">Trading bot monitor</p>
           </div>
           <div className="flex items-center gap-3">
+            <span className={`flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium ${connected ? "border-emerald-500/40 text-emerald-400 bg-emerald-500/10" : "border-zinc-700 text-zinc-500"}`}>
+              <span className={`h-1.5 w-1.5 rounded-full ${connected ? "bg-emerald-500 animate-pulse" : "bg-zinc-500"}`} />
+              {connected ? "WebSocket Live" : "Polling fallback (10s)"}
+            </span>
             {health?.bots.map((b) => (
               <span key={b.market} className={`flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium ${b.stale ? "border-red-500/40 text-red-400" : "border-emerald-500/40 text-emerald-400"}`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${b.stale ? "bg-red-500" : "bg-emerald-500"}`} />
@@ -213,7 +217,7 @@ export default function Dashboard() {
         </section>
 
         <footer className="mt-10 border-t border-zinc-800/60 pt-4 text-xs text-zinc-600">
-          Auto-refresh 30s. Data: Postgres via SignalDash API.
+          Real-time: SignalR WebSocket live push (with 10s fallback). Data: Postgres via SignalDash API.
         </footer>
       </div>
     </main>
