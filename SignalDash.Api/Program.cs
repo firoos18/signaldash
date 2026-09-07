@@ -10,6 +10,7 @@ using Dapper;
 using Npgsql;
 using SignalDash.Api.Modules.Market;
 using SignalDash.Api.Modules.Trading;
+using SignalDash.Api.Hubs;
 
 // snake_case DB columns → camelCase properties
 DefaultTypeMap.MatchNamesWithUnderscores = true;
@@ -24,7 +25,8 @@ builder.Services.AddScoped<IDbConnection>(_ => new NpgsqlConnection(
     builder.Configuration.GetConnectionString("SignalDash")
     ?? throw new InvalidOperationException("ConnectionStrings:SignalDash missing")));
 builder.Services.AddCors(o => o.AddPolicy("frontend", p =>
-    p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
+    p.SetIsOriginAllowed(_ => true).AllowAnyHeader().AllowAnyMethod().AllowCredentials()));
+builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -36,7 +38,8 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment()) { app.UseSwagger(); app.UseSwaggerUI(); }
 app.UseCors("frontend");
 
-// ── module endpoints ──
+// ── hubs & endpoints ──
+app.MapHub<TradingHub>("/hubs/trading");
 app.MapTradingEndpoints();
 app.MapMarketEndpoints();
 

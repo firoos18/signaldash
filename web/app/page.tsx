@@ -5,7 +5,8 @@ import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend,
 } from "recharts";
 import { IconActivity, IconTrendingUp, IconWallet, IconChartLine } from "@tabler/icons-react";
-import { api, type Health, type EquityPoint, type Signal, type Trade, type Stats, type Position, type Broker, type Orderbook, type AgentLog } from "@/lib/api";
+import { type HubConnection, HubConnectionBuilder, LogLevel } from "@microsoft/signalr";
+import { api, type Health, type EquityPoint, type Signal, type Trade, type Stats, type Position, type Broker, type Orderbook, type AgentLog } from "../lib/api";
 
 // ponytail: single client page, no RSC/data layer. Fine for one user; split into
 //           server components + suspense if this ever serves many viewers.
@@ -19,6 +20,7 @@ export default function Dashboard() {
   const [brokers, setBrokers] = useState<Broker[]>([]);
   const [orderbook, setOrderbook] = useState<Orderbook[]>([]);
   const [agentLogs, setAgentLogs] = useState<AgentLog[]>([]);
+  const [connected, setConnected] = useState<boolean>(false);
   const [err, setErr] = useState<string | null>(null);
 
   const load = () => {
@@ -28,7 +30,31 @@ export default function Dashboard() {
       })
       .catch((e: Error) => setErr(e.message));
   };
-  useEffect(() => { load(); const id = setInterval(load, 30000); return () => clearInterval(id); }, []);
+
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 10000); // 10s fallback polling
+
+    // WebSocket / SignalR live connection
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5080";
+    const connection = new HubConnectionBuilder()
+      .withUrl(`${apiUrl}/hubs/trading`)
+      .withAutomaticReconnect()
+      .configureLogging(LogLevel.None)
+      .build();
+
+    connection.start()
+      .then(() => {
+        setConnected(true);
+        connection.on("DashboardUpdate", () => load());
+      })
+      .catch(() => setConnected(false));
+
+    return () => {
+      clearInterval(id);
+      connection.stop();
+    };
+  }, []);
 
   const totalStats = stats.reduce((a, s) => ({ trades: a.trades + s.trades, wins: a.wins + s.wins, netPnl: a.netPnl + s.netPnl }), { trades: 0, wins: 0, netPnl: 0 });
   const winRate = totalStats.trades ? (totalStats.wins / totalStats.trades) * 100 : null;
