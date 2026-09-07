@@ -61,6 +61,9 @@ public sealed class PositionRow
     public string Pair { get; set; } = "";
     public string Side { get; set; } = "";
     public double? Entry { get; set; }
+    public double? CurrentPrice { get; set; }
+    public double? UnrealizedPnl { get; set; }
+    public double? UnrealizedPnlPct { get; set; }
     public double? Sl { get; set; }
     public double? Tp { get; set; }
     public double? Units { get; set; }

@@ -54,11 +54,31 @@ public sealed class TradingRepository(IDbConnection db) : ITradingRepository
 
     public Task<IReadOnlyList<PositionRow>> GetPositionsAsync(string? market, CancellationToken ct = default)
         => QueryAsync<PositionRow>(db, """
-            SELECT DISTINCT ON (market, pair) market, pair, side, entry, sl, tp,
-                   units, opened_at, snapshot_ts
-            FROM trn_position
-            WHERE (@market IS NULL OR market = @market)
-            ORDER BY market, pair, snapshot_ts DESC
+            SELECT DISTINCT ON (p.market, p.pair) p.market, p.pair, p.side, p.entry,
+                   p.sl, p.tp, p.units, p.opened_at, p.snapshot_ts,
+                   COALESCE(
+                       (SELECT close FROM trading.market_data m 
+                        JOIN trading.instruments i ON m.instrument_id = i.id 
+                        WHERE i.symbol = p.pair ORDER BY m.timestamp DESC LIMIT 1),
+                       p.entry
+                   ) AS current_price,
+                   CASE 
+                       WHEN p.side = 'LONG' AND p.entry > 0 THEN 
+                           (COALESCE((SELECT close FROM trading.market_data m JOIN trading.instruments i ON m.instrument_id = i.id WHERE i.symbol = p.pair ORDER BY m.timestamp DESC LIMIT 1), p.entry) - p.entry) * COALESCE(p.units, 0)
+                       WHEN p.side = 'SHORT' AND p.entry > 0 THEN 
+                           (p.entry - COALESCE((SELECT close FROM trading.market_data m JOIN trading.instruments i ON m.instrument_id = i.id WHERE i.symbol = p.pair ORDER BY m.timestamp DESC LIMIT 1), p.entry)) * COALESCE(p.units, 0)
+                       ELSE 0 
+                   END AS unrealized_pnl,
+                   CASE 
+                       WHEN p.entry > 0 AND p.side = 'LONG' THEN 
+                           ((COALESCE((SELECT close FROM trading.market_data m JOIN trading.instruments i ON m.instrument_id = i.id WHERE i.symbol = p.pair ORDER BY m.timestamp DESC LIMIT 1), p.entry) - p.entry) / p.entry) * 100
+                       WHEN p.entry > 0 AND p.side = 'SHORT' THEN 
+                           ((p.entry - COALESCE((SELECT close FROM trading.market_data m JOIN trading.instruments i ON m.instrument_id = i.id WHERE i.symbol = p.pair ORDER BY m.timestamp DESC LIMIT 1), p.entry)) / p.entry) * 100
+                       ELSE 0 
+                   END AS unrealized_pnl_pct
+            FROM trn_position p
+            WHERE (@market IS NULL OR p.market = @market)
+            ORDER BY p.market, p.pair, p.snapshot_ts DESC
             """, ct, new { market });
 
     public Task<IReadOnlyList<AgentLogRow>> GetAgentLogsAsync(int limit = 50, CancellationToken ct = default)

@@ -33,6 +33,7 @@ export default function Dashboard() {
   const totalStats = stats.reduce((a, s) => ({ trades: a.trades + s.trades, wins: a.wins + s.wins, netPnl: a.netPnl + s.netPnl }), { trades: 0, wins: 0, netPnl: 0 });
   const winRate = totalStats.trades ? (totalStats.wins / totalStats.trades) * 100 : null;
   const openCount = positions.length;
+  const totalUnrealizedPnl = positions.reduce((acc, p) => acc + (p.unrealizedPnl ?? 0), 0);
 
   return (
     <main className="min-h-[100dvh] bg-zinc-950 text-zinc-100">
@@ -55,11 +56,12 @@ export default function Dashboard() {
         </header>
 
         {/* KPI cards */}
-        <section className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-4">
+        <section className="mb-8 grid grid-cols-2 gap-4 md:grid-cols-5">
           <Kpi icon={<IconWallet size={18} />} label="Equity" value={`$${health?.bots.reduce((a, b) => a + b.equity, 0).toFixed(2) ?? "—"}`} />
+          <Kpi icon={<IconTrendingUp size={18} />} label="Unrealized PnL" value={`${totalUnrealizedPnl >= 0 ? "+" : ""}$${totalUnrealizedPnl.toFixed(2)}`} positive={totalUnrealizedPnl >= 0} />
           <Kpi icon={<IconActivity size={18} />} label="Win rate" value={winRate === null ? "—" : `${winRate.toFixed(1)}%`} sub={`${totalStats.wins}/${totalStats.trades} trades`} />
           <Kpi icon={<IconChartLine size={18} />} label="Open positions" value={String(openCount)} />
-          <Kpi icon={<IconTrendingUp size={18} />} label="Net PnL" value={`$${totalStats.netPnl.toFixed(2)}`} positive={totalStats.netPnl >= 0} />
+          <Kpi icon={<IconTrendingUp size={18} />} label="Net Realized PnL" value={`$${totalStats.netPnl.toFixed(2)}`} positive={totalStats.netPnl >= 0} />
         </section>
 
         {/* equity chart */}
@@ -84,12 +86,16 @@ export default function Dashboard() {
           <section className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-5">
             <h2 className="mb-4 text-sm font-medium text-zinc-400">Open positions</h2>
             {positions.length === 0 ? <Empty label="No open positions." /> : (
-              <Table head={["Pair", "Side", "Entry", "SL", "TP", "Units"]}>
+              <Table head={["Pair", "Side", "Entry", "Current", "Unrealized PnL", "SL", "TP", "Units"]}>
                 {positions.map((p) => (
                   <tr key={p.pair} className="border-t border-zinc-800/60">
                     <td className="py-2 font-mono text-sm">{p.pair}</td>
                     <td><SideBadge side={p.side} /></td>
                     <td className="font-mono text-sm">{p.entry?.toFixed(4)}</td>
+                    <td className="font-mono text-sm">{p.currentPrice?.toFixed(4) ?? "—"}</td>
+                    <td className={`font-mono text-sm font-medium ${(p.unrealizedPnl ?? 0) >= 0 ? "text-emerald-400" : "text-red-400"}`}>
+                      {(p.unrealizedPnl ?? 0) >= 0 ? "+" : ""}{(p.unrealizedPnl ?? 0).toFixed(2)} ({p.unrealizedPnlPct !== null ? `${(p.unrealizedPnlPct ?? 0).toFixed(2)}%` : "—"})
+                    </td>
                     <td className="font-mono text-sm text-red-400">{p.sl?.toFixed(4)}</td>
                     <td className="font-mono text-sm text-emerald-400">{p.tp?.toFixed(4)}</td>
                     <td className="font-mono text-sm">{p.units?.toFixed(4)}</td>
