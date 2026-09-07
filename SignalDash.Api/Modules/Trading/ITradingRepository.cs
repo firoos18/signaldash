@@ -9,4 +9,5 @@ public interface ITradingRepository
     Task<IReadOnlyList<TradeRow>> GetTradesAsync(string? market, int limit, CancellationToken ct = default);
     Task<IReadOnlyList<StatsRow>> GetStatsAsync(CancellationToken ct = default);
     Task<IReadOnlyList<PositionRow>> GetPositionsAsync(string? market, CancellationToken ct = default);
+    Task<IReadOnlyList<AgentLogRow>> GetAgentLogsAsync(int limit = 50, CancellationToken ct = default);
 }

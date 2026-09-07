@@ -67,3 +67,13 @@ public sealed class PositionRow
     public DateTime? OpenedAt { get; set; }
     public DateTime SnapshotTs { get; set; }
 }
+
+public sealed class AgentLogRow
+{
+    public string Bot { get; set; } = "";
+    public string Action { get; set; } = "";
+    public string Symbol { get; set; } = "";
+    public string Status { get; set; } = "";
+    public string Message { get; set; } = "";
+    public DateTime Ts { get; set; }
+}

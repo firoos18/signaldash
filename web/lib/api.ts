@@ -9,6 +9,7 @@ export type Stats = { market: string; trades: number; wins: number; netPnl: numb
 export type Position = { market: string; pair: string; side: string; entry: number | null; sl: number | null; tp: number | null; units: number | null; openedAt: string | null };
 export type Broker = { ticker: string; brokerCode: string; investorType: string; netLots: number; netValueIdr: number; avgPrice: number | null; lastDate: string };
 export type Orderbook = { ticker: string; ts: string; last: number | null; imb5: number | null; imb10: number | null; wall: number | null; fnet: number | null; totalBidLot: number | null; totalAskLot: number | null };
+export type AgentLog = { bot: string; action: string; symbol: string; status: string; message: string; ts: string };
 
 async function get<T>(path: string): Promise<T> {
   const r = await fetch(`${API}${path}`, { cache: "no-store" });
@@ -25,4 +26,5 @@ export const api = {
   positions: () => get<Position[]>("/api/positions"),
   brokers: (days = 7) => get<Broker[]>(`/api/brokers?days=${days}`),
   orderbook: () => get<Orderbook[]>("/api/orderbook"),
+  agentLogs: (limit = 50) => get<AgentLog[]>(`/api/agent-logs?limit=${limit}`),
 };

@@ -43,6 +43,12 @@ public static class TradingModule
         app.MapGet("/api/positions", async (ITradingRepository repo, string? market = null, CancellationToken ct = default)
             => Results.Ok(await repo.GetPositionsAsync(market, ct)));
 
+        app.MapGet("/api/agent-logs", async (ITradingRepository repo, int limit = 50, CancellationToken ct = default) =>
+        {
+            limit = Math.Clamp(limit, 1, 200);
+            return Results.Ok(await repo.GetAgentLogsAsync(limit, ct));
+        });
+
         return app;
     }
 }

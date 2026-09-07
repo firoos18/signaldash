@@ -61,6 +61,19 @@ public sealed class TradingRepository(IDbConnection db) : ITradingRepository
             ORDER BY market, pair, snapshot_ts DESC
             """, ct, new { market });
 
+    public Task<IReadOnlyList<AgentLogRow>> GetAgentLogsAsync(int limit = 50, CancellationToken ct = default)
+        => QueryAsync<AgentLogRow>(db, """
+            SELECT COALESCE(actor, 'atlas') AS bot,
+                   COALESCE(event_type, 'FLEET_CYCLE') AS action,
+                   COALESCE(payload->>'symbol', '-') AS symbol,
+                   COALESCE(payload->>'status', 'OK') AS status,
+                   COALESCE(payload->>'message', '') AS message,
+                   created_at AS ts
+            FROM trading.audit_events
+            ORDER BY created_at DESC
+            LIMIT @limit
+            """, ct, new { limit });
+
     private static async Task<IReadOnlyList<T>> QueryAsync<T>(
         IDbConnection db, string sql, CancellationToken ct, object? p = null)
         => (await db.QueryAsync<T>(new CommandDefinition(sql, p, cancellationToken: ct))).ToList();
